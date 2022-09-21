@@ -17,8 +17,6 @@ class Main {
 
     final Source<Integer, NotUsed> source = Source.range(1, 100);
 
-    System.out.println("Hello world!");
-
     final CompletionStage<Done> done = source.runForeach(i -> System.out.println(i), system);
     done.thenRun(() -> system.terminate());
   }
