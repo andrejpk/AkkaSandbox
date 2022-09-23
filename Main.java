@@ -11,13 +11,16 @@ import java.time.Duration;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 
+record DeviceCloudEvent(String id) { }
+
 class Main {
   public static void main(String[] args) {
     final ActorSystem system = ActorSystem.create("QuickStart");
 
-    final Source<Integer, NotUsed> source = Source.range(1, 100);
+    final Source<DeviceCloudEvent, NotUsed> source = Source.range(1, 100).map(i -> new DeviceCloudEvent(i.toString()));
 
     final CompletionStage<Done> done = source.runForeach(i -> System.out.println(i), system);
     done.thenRun(() -> system.terminate());
   }
+
 }
