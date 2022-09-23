@@ -11,15 +11,43 @@ import java.time.Duration;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 
-record DeviceCloudEvent(String id) { }
+record DeviceCloudEvent(String id, int chassisTemp) {
+}
 
 class Main {
   public static void main(String[] args) {
     final ActorSystem system = ActorSystem.create("QuickStart");
 
-    final Source<DeviceCloudEvent, NotUsed> source = Source.range(1, 100).map(i -> new DeviceCloudEvent(i.toString()));
+    // build a source
+    final Source<DeviceCloudEvent, NotUsed> source = Source
+        .range(1, 1000)
+        .map(i -> new DeviceCloudEvent("device" + i.toString(), (int) (100.0 * Math.random())));
 
-    final CompletionStage<Done> done = source.runForeach(i -> System.out.println(i), system);
+    // a flow
+    final Flow<DeviceCloudEvent, DeviceCloudEvent, NotUsed> hotDeviceFilter = Flow.of(DeviceCloudEvent.class)
+        .filter(m -> m.chassisTemp() > 80);
+
+    // a sink
+    final Sink<DeviceCloudEvent, CompletionStage<Done>> sink = Sink
+        .foreach(m -> System.out.println(m));
+
+    // wire them together into a graph
+    final RunnableGraph<CompletionStage<Done>> runnableGraph =
+        // source.via(hotDeviceFilter).toMat(sink, Keep.right());
+
+      // build graph using GraphDSL (supports more complex flows)
+        RunnableGraph.fromGraph(
+            GraphDSL.create(sink,
+                (builder, out) -> {
+                  final Outlet<DeviceCloudEvent> a = builder.add(source).out();
+                  final FlowShape<DeviceCloudEvent, DeviceCloudEvent> b = builder.add(hotDeviceFilter);
+                  // final Inlet<DeviceCloudEvent> c = builder.add(sink).in();
+                  builder.from(a).via(b).to(out);
+                  return ClosedShape.getInstance();
+                }));
+
+    final CompletionStage<Done> done = runnableGraph.run(system);
+
     done.thenRun(() -> system.terminate());
   }
 
